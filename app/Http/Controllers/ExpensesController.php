@@ -65,15 +65,8 @@ class ExpensesController extends Controller
      */
     public function store(Request $request)
     {
-        $validateArray = [
-			'name' => 'min:6|required',
-			'payment.*.name' => 'min:6|required',
-			'payment.*.value' => 'numeric|required',
-		];
-        if(Auth::user()->hasRole('admin')){
-            $validateArray = array_add($validateArray, 'payment.*.status', ['required', Rule::in(['Un-approved', 'Approved', 'Rejected'])]);
-        }
-        $this->validate($request, $validateArray, $this->getValidationMessages());
+        $isAdmin = Auth::user()->hasRole('admin');
+        $this->validate($request, $this->getValidateArray($isAdmin), $this->getValidationMessages());
         $requestData = $request->all();
         
         $expense = new Expense();
@@ -138,36 +131,60 @@ class ExpensesController extends Controller
      */
     public function update($id, Request $request)
     {
+        $isAdmin = Auth::user()->hasRole('admin');
+        
+        if(!$isAdmin && !Auth::user()->expenses()->where('id', '=', $id)->exists()){
+            Session::flash('flash_message', "Expense doesn't exist!");
+            return redirect('expenses');
+        }
+
+        $this->validate($request, $this->getValidateArray($isAdmin), $this->getValidationMessages());
+        $requestData = $request->all();
+        
+        $expense = Expense::findOrFail($id);
+        $expense->update($requestData);
+        
+        $payments = $request['payment'];
+        $old_payments = $expense->payments();
+        $blocked_payments = $this->getBlockedPayments($old_payments, $isAdmin);
+        $payments_not_to_delete = $this->getPaymentsNotToDelete($payments);
+        $payments_to_destroy = $old_payments->whereNotIn('id', $payments_not_to_delete);
+
+        $expense = $this->deletePayments($expense, $payments_to_destroy, $isAdmin);
+        $this->updatePayments($expense, $payments, $blocked_payments);
+
+        Session::flash('flash_message', 'Expense updated!');
+
+        return redirect('expenses');
+    }
+
+    private function getValidateArray($isAdmin){
         $validateArray = [
 			'name' => 'min:6|required',
 			'payment.*.name' => 'min:6|required',
 			'payment.*.value' => 'numeric|required',
         ];
-
-        $isAdmin = Auth::user()->hasRole('admin');
         if($isAdmin){
             $validateArray = array_add($validateArray, 'payment.*.status', ['required', Rule::in(['Un-approved', 'Approved', 'Rejected'])]);
-        } else if(!Auth::user()->expenses()->where('id', '=', $id)->exists()){
-            Session::flash('flash_message', "Expense doesn't exist!");
-            return redirect('expenses');
         }
 
-        $this->validate($request, $validateArray, $this->getValidationMessages());
-        $requestData = $request->all();
-        
-        $expense = Expense::findOrFail($id);
-        // $data = $request->only(['name']);
-        $expense->update($requestData);
-        
-        $payments = $request['payment'];
-        $old_payments = $expense->payments();
+        return $validateArray;
+    }
+
+    private function getValidationMessages()
+    {
+        return [
+            'payment.*.name.min' => 'Payment name should be minimum 6 characters long.', 
+            'payment.*.name.required' => 'Payment name is required.',
+            'payment.*.value.numeric' => 'Payment value should be number.', 
+            'payment.*.value.required' => 'Payment value is required.',
+            'payment.*.status.required' => 'Payment status is required.', 
+            'payment.*.status.in' => 'Payment status should be Un-approved, Approved or Rejected.', 
+        ];
+    }
+
+    private function getBlockedPayments($old_payments, $isAdmin){
         $blocked_payments = [];
-        $payments_not_to_delete = [];
-        foreach ($payments as $id => $payment){
-            if(!empty($payment['id'])){
-                array_push($payments_not_to_delete, $payment['id']);
-            }
-        }
         if(!$isAdmin){
             foreach($old_payments as $i => $payment){
                 if($payment->status == 'Approved'){
@@ -175,9 +192,22 @@ class ExpensesController extends Controller
                 }
             }
         }
-        $payments_not_to_delete = array_unique($payments_not_to_delete);
-        $payments_to_destroy = $old_payments->whereNotIn('id', $payments_not_to_delete);
 
+        return $blocked_payments;
+    }
+
+    private function getPaymentsNotToDelete($payments){
+        $payments_not_to_delete = [];
+        foreach ($payments as $id => $payment){
+            if(!empty($payment['id'])){
+                array_push($payments_not_to_delete, $payment['id']);
+            }
+        }
+        
+        return $payments_not_to_delete;
+    }
+
+    private function deletePayments($expense, $payments_to_destroy, $isAdmin){
         if(!empty($payments_to_destroy)){
             if(!$isAdmin){
                 $payments_to_destroy->where('status', '<>', 'Approved')->delete();
@@ -187,6 +217,10 @@ class ExpensesController extends Controller
             $expense->save();
         }
 
+        return $expense;
+    }
+
+    private function updatePayments($expense, $payments, $blocked_payments){
         if (isset($payments)) {
             foreach ($payments as $id => $payment){
                 if(!empty($payment['id'])){
@@ -198,23 +232,6 @@ class ExpensesController extends Controller
                 }
             }
         }
-
-        Session::flash('flash_message', 'Expense updated!');
-
-        return redirect('expenses');
-    }
-
-    // do osobnego pliku
-    public function getValidationMessages()
-    {
-        return [
-            'payment.*.name.min' => 'Payment name should be minimum 6 characters long.', 
-            'payment.*.name.required' => 'Payment name is required.',
-            'payment.*.value.numeric' => 'Payment value should be number.', 
-            'payment.*.value.required' => 'Payment value is required.',
-            'payment.*.status.required' => 'Payment status is required.', 
-            'payment.*.status.in' => 'Payment status should be Un-approved, Approved or Rejected.', 
-        ];
     }
 
     /**

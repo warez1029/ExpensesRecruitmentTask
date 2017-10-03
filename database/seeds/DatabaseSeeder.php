@@ -34,12 +34,12 @@ class DatabaseSeeder extends Seeder
     private function createUserExpenses($user, $prefix, $ex_cnt, $pay_cnt){
         for($j=0; $j<$ex_cnt; $j++){
             $expense = new App\Expense();
-            $expense->name = $prefix.' expense '.$j;
+            $expense->name = $prefix.' expense '.($j+1);
             $expense = $user->expenses()->save($expense);
 
             for($i=0; $i<$pay_cnt; $i++){
                 $payment = new App\Payment();
-                $payment->name = $prefix.' payment '.$i;
+                $payment->name = $prefix.' payment '.($i+1);
                 $payment->value = rand(100, 50000)/100.0;
                 $payment->status = 'Un-approved';
                 $expense->payments()->save($payment);
