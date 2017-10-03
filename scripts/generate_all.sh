@@ -1,1 +1,0 @@
-artisan migrate:refresh --seed
