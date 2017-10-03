@@ -30,13 +30,12 @@
                             <table class="table table-borderless">
                                 <thead>
                                     <tr>
-                                        <th>ID</th><th>Name</th><th>Created</th><th>Updated</th><th>Payments</th><th>Summary</th><th>Actions</th>
+                                        <th>Name</th><th>Created</th><th>Updated</th><th>Payments</th><th>Summary</th><th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                 @foreach($expenses as $item)
                                     <tr>
-                                        <td>{{ $item->id }}</td>
                                         <td>{{ $item->name }}</td>
                                         <td>{{ $item->created_at->format('F d, Y h:ia') }}</td>
                                         <td>{{ $item->updated_at->format('F d, Y h:ia') }}</td>

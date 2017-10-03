@@ -70,11 +70,7 @@ class UsersController extends Controller
     public function store(Request $request)
     {
         if(Auth::user()->hasRole('admin')){
-            $this->validate($request, [
-                'name' => 'required|string|max:255',
-                'email' => 'required|string|email|max:255|unique:users',
-                'password' => 'required|string|min:6|confirmed',
-            ]);
+            $this->validate($request, $this->getValidateArray());
             $requestData = $request->all();
             $requestData['password'] =  Hash::make($requestData['password']);
             
@@ -145,11 +141,7 @@ class UsersController extends Controller
     public function update($id, Request $request)
     {
         if(Auth::user()->hasRole('admin')){
-            $this->validate($request, [
-                'name' => 'required|string|max:255',
-                'email' => 'required|string|email|max:255|unique:users',
-                'password' => 'required|string|min:6|confirmed',
-            ]);
+            $this->validate($request, $this->getValidateArray());
             $requestData = $request->all();
             $requestData['password'] =  Hash::make($requestData['password']);
             
@@ -170,6 +162,14 @@ class UsersController extends Controller
         } else {
             return redirect()->route('login');
         }
+    }
+
+    private function getValidateArray(){
+        return [
+            'name' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255|unique:users',
+            'password' => 'required|string|min:6|confirmed',
+        ];
     }
 
     /**
